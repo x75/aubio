@@ -40,6 +40,7 @@ skip_objects = [
   'source_wavread',
   #'sampler',
   'audio_unit',
+  'timestretch', # TODO fix parsing of uint_t *read in _do
   ]
 
 def get_preprocessor():
