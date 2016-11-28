@@ -123,6 +123,11 @@ def configure(ctx):
     ctx.check(header_name='getopt.h', mandatory = False)
     ctx.check(header_name='unistd.h', mandatory = False)
 
+    ctx.check(header_name='pthread.h', mandatory = False)
+    needs_pthread = ctx.get_define("HAVE_PTHREAD_H") is not None
+    if needs_pthread:
+        ctx.check_cc(lib="pthread", uselib_store="PTHREAD", mandatory=needs_pthread)
+
     target_platform = sys.platform
     if ctx.options.target_platform:
         target_platform = ctx.options.target_platform
