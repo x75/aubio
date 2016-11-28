@@ -41,6 +41,8 @@ skip_objects = [
   #'sampler',
   'audio_unit',
   'timestretch', # TODO fix parsing of uint_t *read in _do
+  'sampler', # TODO fix parsing of uint_t *read in _do
+  'ringbuffer',
   ]
 
 def get_preprocessor():
