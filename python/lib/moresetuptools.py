@@ -4,6 +4,46 @@ import sys, os, glob, subprocess
 import distutils, distutils.command.clean, distutils.dir_util
 from .gen_external import generate_external, header, output_path
 
+def get_aubio_version():
+    # read from VERSION
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    version_file = os.path.join(this_file_dir, '..', '..', 'VERSION')
+
+    if not os.path.isfile(version_file):
+        raise SystemError("VERSION file not found.")
+
+    for l in open(version_file).readlines():
+        #exec (l.strip())
+        if l.startswith('AUBIO_MAJOR_VERSION'):
+            AUBIO_MAJOR_VERSION = int(l.split('=')[1])
+        if l.startswith('AUBIO_MINOR_VERSION'):
+            AUBIO_MINOR_VERSION = int(l.split('=')[1])
+        if l.startswith('AUBIO_PATCH_VERSION'):
+            AUBIO_PATCH_VERSION = int(l.split('=')[1])
+        if l.startswith('AUBIO_VERSION_STATUS'):
+            AUBIO_VERSION_STATUS = l.split('=')[1].strip()[1:-1]
+
+    if AUBIO_MAJOR_VERSION is None or AUBIO_MINOR_VERSION is None \
+            or AUBIO_PATCH_VERSION is None:
+        raise SystemError("Failed parsing VERSION file.")
+
+    verstr = '.'.join(map(str, [AUBIO_MAJOR_VERSION,
+                                     AUBIO_MINOR_VERSION,
+                                     AUBIO_PATCH_VERSION]))
+
+    if AUBIO_VERSION_STATUS is not None:
+        verstr += AUBIO_VERSION_STATUS
+    return verstr
+
+def get_aubio_pyversion():
+    # convert to version for python according to pep 440
+    # see https://www.python.org/dev/peps/pep-0440/
+    verstr = get_aubio_version()
+    if '~alpha' in verstr:
+        verstr = verstr.split('~')[0] + 'a1'
+    # TODO: add rc, .dev, and .post suffixes, add numbering
+    return verstr
+
 # inspired from https://gist.github.com/abergmeier/9488990
 def add_packages(packages, ext=None, **kw):
     """ use pkg-config to search which of 'packages' are installed """
@@ -21,6 +61,7 @@ def add_packages(packages, ext=None, **kw):
              }
 
     for package in packages:
+        print("checking for {:s}".format(package))
         cmd = ['pkg-config', '--libs', '--cflags', package]
         try:
             tokens = subprocess.check_output(cmd)
@@ -52,15 +93,14 @@ def add_local_aubio_lib(ext):
     ext.library_dirs += [os.path.join('build', 'src')]
     ext.libraries += ['aubio']
 
-def add_local_aubio_sources(ext):
+def add_local_aubio_sources(ext, usedouble = False):
     """ build aubio inside python module instead of linking against libaubio """
-    print("Warning: libaubio was not built with waf, adding src/")
-    # create an empty header, macros will be passed on the command line
-    fake_config_header = os.path.join('python', 'ext', 'config.h')
-    distutils.file_util.write_file(fake_config_header, "")
+    print("Info: libaubio was not installed or built locally with waf, adding src/")
     aubio_sources = sorted(glob.glob(os.path.join('src', '**.c')))
     aubio_sources += sorted(glob.glob(os.path.join('src', '*', '**.c')))
     ext.sources += aubio_sources
+
+def add_local_macros(ext, usedouble = False):
     # define macros (waf puts them in build/src/config.h)
     for define_macro in ['HAVE_STDLIB_H', 'HAVE_STDIO_H',
                          'HAVE_MATH_H', 'HAVE_STRING_H',
@@ -69,14 +109,21 @@ def add_local_aubio_sources(ext):
                          'HAVE_MEMCPY_HACKS']:
         ext.define_macros += [(define_macro, 1)]
 
+def add_external_deps(ext, usedouble = False):
     # loof for additional packages
     print("Info: looking for *optional* additional packages")
     packages = ['libavcodec', 'libavformat', 'libavutil', 'libavresample',
                 'jack',
-                'sndfile', 'samplerate',
+                'sndfile',
+                'samplerate',
                 'rubberband',
                 #'fftw3f',
                ]
+    # samplerate only works with float
+    if usedouble is False:
+        packages += ['samplerate']
+    else:
+        print("Info: not adding libsamplerate in double precision mode")
     add_packages(packages, ext=ext)
     if 'avcodec' in ext.libraries \
             and 'avformat' in ext.libraries \
@@ -115,14 +162,17 @@ def add_local_aubio_sources(ext):
 
 def add_system_aubio(ext):
     # use pkg-config to find aubio's location
-    add_packages(['aubio'], ext)
+    aubio_version = get_aubio_version()
+    add_packages(['aubio = ' + aubio_version], ext)
     if 'aubio' not in ext.libraries:
-        print("Error: libaubio not found")
+        print("Info: aubio " + aubio_version + " was not found by pkg-config")
+    else:
+        print("Info: using system aubio " + aubio_version + " found in " + ' '.join(ext.library_dirs))
 
 class CleanGenerated(distutils.command.clean.clean):
     def run(self):
-        distutils.dir_util.remove_tree(output_path)
-        distutils.command.clean.clean.run(self)
+        if os.path.isdir(output_path):
+            distutils.dir_util.remove_tree(output_path)
 
 from distutils.command.build_ext import build_ext as _build_ext
 class build_ext(_build_ext):
@@ -144,22 +194,28 @@ class build_ext(_build_ext):
                     level=distutils.log.INFO)
 
     def build_extension(self, extension):
-        if self.enable_double:
+        if self.enable_double or 'HAVE_AUBIO_DOUBLE' in os.environ:
             extension.define_macros += [('HAVE_AUBIO_DOUBLE', 1)]
-        if os.path.isfile('src/aubio.h'):
-            # if aubio headers are found in this directory
-            add_local_aubio_header(extension)
-            # was waf used to build the shared lib?
-            if os.path.isdir(os.path.join('build','src')):
-                # link against build/src/libaubio, built with waf
+            enable_double = True
+        else:
+            enable_double = False
+        # seack for aubio headers and lib in PKG_CONFIG_PATH
+        add_system_aubio(extension)
+        # the lib was not installed on this system
+        if 'aubio' not in extension.libraries:
+            # use local src/aubio.h
+            if os.path.isfile(os.path.join('src', 'aubio.h')):
+                add_local_aubio_header(extension)
+            add_local_macros(extension)
+            # look for a local waf build
+            if os.path.isfile(os.path.join('build','src', 'fvec.c.1.o')):
                 add_local_aubio_lib(extension)
             else:
+                # check for external dependencies
+                add_external_deps(extension, usedouble=enable_double)
                 # add libaubio sources and look for optional deps with pkg-config
-                add_local_aubio_sources(extension, usedouble=self.enable_double)
-        else:
-            # look for aubio headers and lib using pkg-config
-            add_system_aubio(extension)
+                add_local_aubio_sources(extension, usedouble=enable_double)
         # generate files python/gen/*.c, python/gen/aubio-generated.h
         extension.sources += generate_external(header, output_path, overwrite = False,
-                usedouble=self.enable_double)
+                usedouble=enable_double)
         return _build_ext.build_extension(self, extension)

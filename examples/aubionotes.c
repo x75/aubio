@@ -34,12 +34,12 @@ void process_block (fvec_t *ibuf, fvec_t *obuf)
   aubio_notes_do (notes, ibuf, obuf);
   // did we get a note off?
   if (obuf->data[2] != 0) {
-    lastmidi = aubio_freqtomidi (obuf->data[2]) + .5;
+    lastmidi = obuf->data[2];
     send_noteon(lastmidi, 0);
   }
   // did we get a note on?
   if (obuf->data[0] != 0) {
-    lastmidi = aubio_freqtomidi (obuf->data[0]) + .5;
+    lastmidi = obuf->data[0];
     send_noteon(lastmidi, obuf->data[1]);
   }
 }
@@ -69,10 +69,26 @@ int main(int argc, char **argv) {
   notes = new_aubio_notes ("default", buffer_size, hop_size, samplerate);
   if (notes == NULL) { ret = 1; goto beach; }
 
+  if (onset_minioi != 0.) {
+    aubio_notes_set_minioi_ms(notes, onset_minioi);
+  }
+  if (onset_threshold != 0.) {
+    errmsg ("warning: onset threshold not supported yet\n");
+    //aubio_onset_set_threshold(aubio_notes_get_aubio_onset(o), onset_threshold);
+  }
+  if (silence_threshold != -90.) {
+    if (aubio_notes_set_silence (notes, silence_threshold) != 0) {
+      errmsg ("failed setting notes silence threshold to %.2f\n",
+          silence_threshold);
+    }
+  }
+
   examples_common_process((aubio_process_func_t)process_block, process_print);
 
-  // send a last note off
-  send_noteon (lastmidi, 0);
+  // send a last note off if required
+  if (lastmidi) {
+    send_noteon (lastmidi, 0);
+  }
 
   del_aubio_notes (notes);
 

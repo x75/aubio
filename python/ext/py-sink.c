@@ -80,27 +80,20 @@ Py_sink_new (PyTypeObject * pytype, PyObject * args, PyObject * kwds)
     return NULL;
   }
 
-  self->uri = "none";
+  self->uri = NULL;
   if (uri != NULL) {
-    self->uri = uri;
+    self->uri = (char_t *)malloc(sizeof(char_t) * (strnlen(uri, PATH_MAX) + 1));
+    strncpy(self->uri, uri, strnlen(uri, PATH_MAX) + 1);
   }
 
   self->samplerate = Py_aubio_default_samplerate;
-  if ((sint_t)samplerate > 0) {
+  if (samplerate != 0) {
     self->samplerate = samplerate;
-  } else if ((sint_t)samplerate < 0) {
-    PyErr_SetString (PyExc_ValueError,
-        "can not use negative value for samplerate");
-    return NULL;
   }
 
   self->channels = 1;
-  if ((sint_t)channels > 0) {
+  if (channels != 0) {
     self->channels = channels;
-  } else if ((sint_t)channels < 0) {
-    PyErr_SetString (PyExc_ValueError,
-        "can not use negative or null value for channels");
-    return NULL;
   }
 
   return (PyObject *) self;
@@ -109,17 +102,20 @@ Py_sink_new (PyTypeObject * pytype, PyObject * args, PyObject * kwds)
 static int
 Py_sink_init (Py_sink * self, PyObject * args, PyObject * kwds)
 {
-  if (self->channels == 1) {
-    self->o = new_aubio_sink ( self->uri, self->samplerate );
-  } else {
-    self->o = new_aubio_sink ( self->uri, 0 );
-    aubio_sink_preset_channels ( self->o, self->channels );
-    aubio_sink_preset_samplerate ( self->o, self->samplerate );
-  }
+  self->o = new_aubio_sink ( self->uri, 0 );
   if (self->o == NULL) {
-    PyErr_SetString (PyExc_RuntimeError, "error creating sink with this uri");
+    // error string was set in new_aubio_sink
     return -1;
   }
+  if (aubio_sink_preset_channels(self->o, self->channels) != 0) {
+    // error string was set in aubio_sink_preset_channels
+    return -1;
+  }
+  if (aubio_sink_preset_samplerate(self->o, self->samplerate) != 0) {
+    // error string was set in aubio_sink_preset_samplerate
+    return -1;
+  }
+
   self->samplerate = aubio_sink_get_samplerate ( self->o );
   self->channels = aubio_sink_get_channels ( self->o );
 
@@ -131,6 +127,9 @@ Py_sink_del (Py_sink *self, PyObject *unused)
 {
   del_aubio_sink(self->o);
   free(self->mwrite_data.data);
+  if (self->uri) {
+    free(self->uri);
+  }
   Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
@@ -204,10 +203,25 @@ Pyaubio_sink_close (Py_sink *self, PyObject *unused)
   Py_RETURN_NONE;
 }
 
+static char Pyaubio_sink_enter_doc[] = "";
+static PyObject* Pyaubio_sink_enter(Py_sink *self, PyObject *unused) {
+  Py_INCREF(self);
+  return (PyObject*)self;
+}
+
+static char Pyaubio_sink_exit_doc[] = "";
+static PyObject* Pyaubio_sink_exit(Py_sink *self, PyObject *unused) {
+  return Pyaubio_sink_close(self, unused);
+}
+
 static PyMethodDef Py_sink_methods[] = {
   {"do", (PyCFunction) Py_sink_do, METH_VARARGS, Py_sink_do_doc},
   {"do_multi", (PyCFunction) Py_sink_do_multi, METH_VARARGS, Py_sink_do_multi_doc},
   {"close", (PyCFunction) Pyaubio_sink_close, METH_NOARGS, Py_sink_close_doc},
+  {"__enter__", (PyCFunction)Pyaubio_sink_enter, METH_NOARGS,
+    Pyaubio_sink_enter_doc},
+  {"__exit__",  (PyCFunction)Pyaubio_sink_exit, METH_VARARGS,
+    Pyaubio_sink_exit_doc},
   {NULL} /* sentinel */
 };
 

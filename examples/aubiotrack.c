@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
   // set silence threshold very low to output beats even during silence
   // aubio_tempo_set_silence(tempo, -1000.);
   if (onset_threshold != 0.) aubio_tempo_set_threshold (tempo, onset_threshold);
+  if (onset_minioi != 0.) errmsg ("warning: minioio not supported yet\n");
 
   wavetable = new_aubio_wavetable (samplerate, hop_size);
   aubio_wavetable_set_freq ( wavetable, 2450.);
@@ -88,7 +89,9 @@ int main(int argc, char **argv) {
   examples_common_process((aubio_process_func_t)process_block,process_print);
 
   // send a last note off
-  send_noteon (miditap_note, 0);
+  if (usejack) {
+    send_noteon (miditap_note, 0);
+  }
 
   del_aubio_tempo(tempo);
   del_aubio_wavetable (wavetable);

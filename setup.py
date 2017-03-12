@@ -6,24 +6,11 @@ from python.lib.moresetuptools import *
 # function to generate gen/*.{c,h}
 from python.lib.gen_external import generate_external, header, output_path
 
-# read from VERSION
-for l in open('VERSION').readlines(): exec (l.strip())
-
-if AUBIO_MAJOR_VERSION is None or AUBIO_MINOR_VERSION is None \
-        or AUBIO_PATCH_VERSION is None:
-    raise SystemError("Failed parsing VERSION file.")
-
-__version__ = '.'.join(map(str, [AUBIO_MAJOR_VERSION,
-                                 AUBIO_MINOR_VERSION,
-                                 AUBIO_PATCH_VERSION]))
-if AUBIO_VERSION_STATUS is not None:
-    if AUBIO_VERSION_STATUS.startswith('~'):
-        AUBIO_VERSION_STATUS = AUBIO_VERSION_STATUS[1:]
-    __version__ += AUBIO_VERSION_STATUS
+__version__ = get_aubio_pyversion()
 
 include_dirs = []
 library_dirs = []
-define_macros = []
+define_macros = [('AUBIO_VERSION', '%s' % __version__)]
 extra_link_args = []
 
 include_dirs += [ 'python/ext' ]
@@ -48,7 +35,8 @@ aubio_extension = Extension("aubio._aubio",
 
 if os.path.isfile('src/aubio.h'):
     if not os.path.isdir(os.path.join('build','src')):
-        __version__ += 'a2' # python only version
+        pass
+        #__version__ += 'a2' # python only version
 
 classifiers = [
     'Development Status :: 4 - Beta',
@@ -78,13 +66,17 @@ distrib = setup(name='aubio',
     author_email = 'piem@aubio.org',
     maintainer = 'Paul Brossier',
     maintainer_email = 'piem@aubio.org',
-    url = 'http://aubio.org/',
+    url = 'https://aubio.org/',
     platforms = 'any',
     classifiers = classifiers,
     install_requires = ['numpy'],
+    setup_requires = ['numpy'],
     cmdclass = {
         'clean': CleanGenerated,
         'build_ext': build_ext,
         },
     test_suite = 'nose2.collector.collector',
+    extras_require = {
+        'tests': ['numpy'],
+        },
     )

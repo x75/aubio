@@ -2,6 +2,11 @@
 #include "aubio-types.h"
 #include "py-musicutils.h"
 
+// this dummy macro is used to convince windows that a string passed as -D flag
+// is just that, a string, and not a double.
+#define REDEFINESTRING(x) #x
+#define DEFINEDSTRING(x) REDEFINESTRING(x)
+
 static char aubio_module_doc[] = "Python module for the aubio library";
 
 static char Py_alpha_norm_doc[] = ""
@@ -323,6 +328,7 @@ initaubio (void)
   PyModule_AddObject (m, "sink", (PyObject *) & Py_sinkType);
 
   PyModule_AddStringConstant(m, "float_type", AUBIO_NPY_SMPL_STR);
+  PyModule_AddStringConstant(m, "__version__", DEFINEDSTRING(AUBIO_VERSION));
 
   // add generated objects
   add_generated_objects(m);

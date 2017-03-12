@@ -74,6 +74,8 @@ int main(int argc, char **argv) {
     aubio_onset_set_threshold (o, onset_threshold);
   if (silence_threshold != -90.)
     aubio_onset_set_silence (o, silence_threshold);
+  if (onset_minioi != 0.)
+    aubio_onset_set_minioi_s (o, onset_minioi);
 
   onset = new_fvec (1);
 
@@ -84,7 +86,9 @@ int main(int argc, char **argv) {
   examples_common_process((aubio_process_func_t)process_block, process_print);
 
   // send a last note off
-  send_noteon (miditap_note, 0);
+  if (usejack) {
+    send_noteon (miditap_note, 0);
+  }
 
   del_aubio_onset (o);
   del_aubio_wavetable (wavetable);

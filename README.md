@@ -87,7 +87,7 @@ If waf is not found in the directory, you can download and install it with:
 
     make getwaf
 
-aubio compiles on Linux, Mac OS X, Cygwin, and iOS.
+aubio compiles on Linux, Mac OS X, Windows, Cygwin, and iOS.
 
 Installation
 ------------
@@ -162,7 +162,7 @@ Questions, comments, suggestions, and contributions are welcome. Use the
 mailing list: <aubio-user@aubio.org>.
 
 To subscribe to the list, use the mailman form:
-http://lists.aubio.org/listinfo/aubio-user/
+https://lists.aubio.org/listinfo/aubio-user/
 
 Alternatively, feel free to contact directly the author.
 
@@ -170,7 +170,7 @@ Alternatively, feel free to contact directly the author.
 Copyright and License Information
 ---------------------------------
 
-Copyright (C) 2003-2013 Paul Brossier <piem@aubio.org>
+Copyright (C) 2003-2016 Paul Brossier <piem@aubio.org>
 
 aubio is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software

@@ -14,7 +14,6 @@ skip_objects = [
   'pvoc',
   'filter',
   'filterbank',
-  #'resampler',
   # AUBIO_UNSTABLE
   'hist',
   'parameter',
@@ -78,10 +77,12 @@ def get_preprocessor():
 
     return cpp_cmd
 
-def get_cpp_objects(header=header):
+def get_cpp_objects(header=header, usedouble=False):
     cpp_cmd = get_preprocessor()
 
     macros = [('AUBIO_UNSTABLE', 1)]
+    if usedouble:
+        macros += [('HAVE_AUBIO_DOUBLE', 1)]
 
     if not os.path.isfile(header):
         raise Exception("could not find include file " + header)
@@ -179,7 +180,7 @@ def generate_external(header=header, output_path=output_path, usedouble=False, o
     if not os.path.isdir(output_path): os.mkdir(output_path)
     elif not overwrite: return sorted(glob.glob(os.path.join(output_path, '*.c')))
 
-    cpp_output, cpp_objects = get_cpp_objects(header)
+    cpp_output, cpp_objects = get_cpp_objects(header, usedouble=usedouble)
 
     lib = analyze_cpp_output(cpp_objects, cpp_output)
     # print_cpp_output_results(lib, cpp_output)
@@ -250,7 +251,7 @@ void add_generated_objects( PyObject *m );
         print ("wrote %s" % output_file )
         # no need to add header to list of sources
 
-    return sources_list
+    return sorted(sources_list)
 
 if __name__ == '__main__':
     if len(sys.argv) > 1: header = sys.argv[1]
