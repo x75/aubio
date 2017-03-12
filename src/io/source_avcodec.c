@@ -53,6 +53,14 @@
 
 #define AUBIO_AVCODEC_MAX_BUFFER_SIZE FF_MIN_BUFFER_SIZE
 
+#ifdef HAVE_PTHREAD_H
+// Global mutex to make sure avcodec_open2 is not called simultaneously in a
+// multithreaded environment. Comment the following define if no lock required.
+#define HAVE_AUBIO_AVCODEC_MUTEX
+#include <pthread.h>
+pthread_mutex_t aubio_avcodec_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif /* HAVE_PTHREAD_H */
+
 struct _aubio_source_avcodec_t {
   uint_t hop_size;
   uint_t samplerate;
@@ -120,6 +128,10 @@ aubio_source_avcodec_t * new_aubio_source_avcodec(const char_t * path, uint_t sa
   if (s->path) AUBIO_FREE(s->path);
   s->path = AUBIO_ARRAY(char_t, strnlen(path, PATH_MAX) + 1);
   strncpy(s->path, path, strnlen(path, PATH_MAX) + 1);
+
+#ifdef HAVE_AUBIO_AVCODEC_MUTEX
+  pthread_mutex_lock(&aubio_avcodec_mutex);
+#endif /* HAVE_AUBIO_AVCODEC_MUTEX */
 
   // register all formats and codecs
   av_register_all();
@@ -230,6 +242,10 @@ aubio_source_avcodec_t * new_aubio_source_avcodec(const char_t * path, uint_t sa
     goto beach;
   }
 
+#ifdef HAVE_AUBIO_AVCODEC_MUTEX
+  pthread_mutex_unlock(&aubio_avcodec_mutex);
+#endif /* HAVE_AUBIO_AVCODEC_MUTEX */
+
   /* get input specs */
   s->input_samplerate = avCodecCtx->sample_rate;
   s->input_channels   = avCodecCtx->channels;
@@ -279,6 +295,9 @@ beach_streamopts:
 beach:
   //AUBIO_ERR("can not read %s at samplerate %dHz with a hop_size of %d\n",
   //    s->path, s->samplerate, s->hop_size);
+#ifdef HAVE_AUBIO_AVCODEC_MUTEX
+  pthread_mutex_unlock(&aubio_avcodec_mutex);
+#endif /* HAVE_AUBIO_AVCODEC_MUTEX */
   del_aubio_source_avcodec(s);
   return NULL;
 }
