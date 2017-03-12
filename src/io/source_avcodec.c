@@ -75,6 +75,7 @@ struct _aubio_source_avcodec_t {
   sint_t selected_stream;
   uint_t eof;
   uint_t multi;
+  uint_t has_network_url;
 };
 
 // hack to create or re-create the context the first time _do or _do_multi is called
@@ -89,10 +90,11 @@ uint_t aubio_source_avcodec_has_network_url(aubio_source_avcodec_t *s) {
       *port_ptr = 0, path_size = 256;
   av_url_split(proto, proto_size, authorization, authorization_size, hostname,
       hostname_size, port_ptr, uripath, path_size, s->path);
+  s->has_network_url = 0;
   if (strlen(proto)) {
-    return 1;
+    s->has_network_url = 1;
   }
-  return 0;
+  return s->has_network_url;
 }
 
 
@@ -128,12 +130,20 @@ aubio_source_avcodec_t * new_aubio_source_avcodec(const char_t * path, uint_t sa
 
   // try opening the file and get some info about it
   AVFormatContext *avFormatCtx = s->avFormatCtx;
+  AVDictionary *streamopts = 0;
+  if (s->has_network_url) {
+    if (av_dict_set(&streamopts, "timeout", "1000000", 0)) { // in microseconds
+      AUBIO_WRN("source_avcodec: Failed setting timeout to 1000000 for %s\n", s->path);
+    } else {
+      AUBIO_WRN("source_avcodec: Setting timeout to 1000000 for %s\n", s->path);
+    }
+  }
   avFormatCtx = NULL;
-  if ( (err = avformat_open_input(&avFormatCtx, s->path, NULL, NULL) ) < 0 ) {
+  if ( (err = avformat_open_input(&avFormatCtx, s->path, NULL, &streamopts) ) < 0 ) {
     char errorstr[256];
     av_strerror (err, errorstr, sizeof(errorstr));
     AUBIO_ERR("source_avcodec: Failed opening %s (%s)\n", s->path, errorstr);
-    goto beach;
+    goto beach_streamopts;
   }
 
   // try to make sure max_analyze_duration is big enough for most songs
@@ -261,8 +271,11 @@ aubio_source_avcodec_t * new_aubio_source_avcodec(const char_t * path, uint_t sa
 
   //av_log_set_level(AV_LOG_QUIET);
 
+  av_dict_free(&streamopts);
   return s;
 
+beach_streamopts:
+  av_dict_free(&streamopts);
 beach:
   //AUBIO_ERR("can not read %s at samplerate %dHz with a hop_size of %d\n",
   //    s->path, s->samplerate, s->hop_size);
