@@ -9,7 +9,8 @@ int main (int argc, char **argv)
   if (argc < 4) {
     err = 2;
     PRINT_ERR("not enough arguments\n");
-    PRINT_MSG("usage: %s <input_path> <output_path> <transpose> [mode] [hop_size] [samplerate]\n", argv[0]);
+    PRINT_MSG("usage: %s <input_path> <output_path> <transpose> [mode] "
+        "[hop_size] [samplerate]\n", argv[0]);
     PRINT_MSG(" with <transpose> a number of semi tones in the range [-24, 24]\n");
     PRINT_MSG(" and [mode] in 'default', 'crispness:0', ..., 'crispness:6'\n");
     return err;
@@ -71,5 +72,6 @@ beach_source:
   del_fvec(vec);
   del_fvec(out);
 beach_fvec:
+  aubio_cleanup();
   return err;
 }
