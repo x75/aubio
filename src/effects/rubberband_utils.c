@@ -1,11 +1,10 @@
 
 
-#include "config.h"
 #include "aubio_priv.h"
 
 #ifdef HAVE_RUBBERBAND
 
-#include "rubberband/rubberband-c.h"
+#include <rubberband/rubberband-c.h>
 
 // check rubberband is 1.8.1, warn if 1.3
 #if !((RUBBERBAND_API_MAJOR_VERSION >= 2) && \

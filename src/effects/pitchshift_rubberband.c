@@ -18,15 +18,14 @@
 
 */
 
-#include "config.h"
+#include "aubio_priv.h"
 
 #ifdef HAVE_RUBBERBAND
 
-#include "aubio_priv.h"
 #include "fvec.h"
 #include "effects/pitchshift.h"
 
-#include "rubberband/rubberband-c.h"
+#include <rubberband/rubberband-c.h>
 
 /** generic pitch shifting structure */
 struct _aubio_pitchshift_t
