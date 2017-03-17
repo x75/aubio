@@ -56,12 +56,12 @@ matrix:
       os: osx
       osx_image: xcode8.2
       compiler: clang
-      env: WAFOPTS="--with-target-platform=ios --disable-avcodec --disable-sndfile" AUBIO_NOTESTS=1
+      env: WAFOPTS="--with-target-platform=ios --disable-avcodec --disable-sndfile --disable-rubberband" AUBIO_NOTESTS=1
     - language: C
       os: osx
       osx_image: xcode8.2
       compiler: clang
-      env: WAFOPTS="--with-target-platform=iosimulator --disable-avcodec --disable-sndfile" AUBIO_NOTESTS=1
+      env: WAFOPTS="--with-target-platform=iosimulator --disable-avcodec --disable-sndfile --disable-rubberband" AUBIO_NOTESTS=1
 
 # use trusty
 dist: trusty
