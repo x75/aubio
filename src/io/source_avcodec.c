@@ -387,6 +387,7 @@ void aubio_source_avcodec_readframe(aubio_source_avcodec_t *s, uint_t * read_sam
       char errorstr[256];
       av_strerror (err, errorstr, sizeof(errorstr));
       AUBIO_ERR("source_avcodec: could not read frame in %s (%s)\n", s->path, errorstr);
+      s->eof = 1;
       goto beach;
     }
   } while (avPacket.stream_index != s->selected_stream);
@@ -594,7 +595,11 @@ uint_t aubio_source_avcodec_close(aubio_source_avcodec_t * s) {
   }
   s->avr = NULL;
   if (s->avCodecCtx != NULL) {
+#ifndef HAVE_AUBIO_LIBAVCODEC_DEPRECATED
+    avcodec_free_context( &s->avCodecCtx );
+#else
     avcodec_close ( s->avCodecCtx );
+#endif
   }
   s->avCodecCtx = NULL;
   if (s->avFormatCtx != NULL) {
