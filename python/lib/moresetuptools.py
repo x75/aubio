@@ -112,7 +112,8 @@ def add_local_macros(ext, usedouble = False):
 def add_external_deps(ext, usedouble = False):
     # loof for additional packages
     print("Info: looking for *optional* additional packages")
-    packages = ['libavcodec', 'libavformat', 'libavutil', 'libavresample',
+    packages = ['libavcodec', 'libavformat', 'libavutil',
+                'libswresample', 'libavresample',
                 'sndfile',
                 'rubberband',
                 #'fftw3f',
