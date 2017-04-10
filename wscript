@@ -333,7 +333,7 @@ def configure(ctx):
                 uselib_store = 'AVUTIL',
                 mandatory = ctx.options.enable_avcodec)
         ctx.check_cfg(package = 'libswresample',
-                args = '--cflags --libs libswresample >= 2.3.0',
+                args = '--cflags --libs libswresample >= 1.2.0',
                 uselib_store = 'SWRESAMPLE',
                 mandatory = False)
         if 'HAVE_SWRESAMPLE' not in ctx.env:
@@ -455,7 +455,10 @@ def txt2man(bld):
 def doxygen(bld):
     # build documentation from source files using doxygen
     if bld.env['DOXYGEN']:
-        bld( name = 'doxygen', rule = 'doxygen ${SRC} > /dev/null',
+        bld.env.VERSION = VERSION
+        rule = '( cat ${SRC} && echo PROJECT_NUMBER=${VERSION}; )'
+        rule += ' | doxygen - > /dev/null'
+        bld( name = 'doxygen', rule = rule,
                 source = 'doc/web.cfg',
                 target = '../doc/web/html/index.html',
                 cwd = 'doc')

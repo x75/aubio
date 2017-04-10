@@ -1,5 +1,6 @@
 #! python
 import os
+import sys
 
 __version_info = {} # keep a reference to parse VERSION once
 
@@ -81,21 +82,26 @@ def get_git_revision_hash(short=True):
     try:
         gitsha = subprocess.check_output(gitcmd).strip().decode('utf8')
     except Exception as e:
-        print('git command error :%s' % e)
+        sys.stderr.write('git command error :%s\n' % e)
         return None
     # check if we have a clean tree
     gitcmd = ['git', '-C', aubio_dir, 'status', '--porcelain']
     try:
         output = subprocess.check_output(gitcmd).decode('utf8')
         if len(output):
-            print('Info: current tree is not clean\n')
-            print(output)
+            sys.stderr.write('Info: current tree is not clean\n\n')
+            sys.stderr.write(output + '\n')
             gitsha += '+mods'
     except subprocess.CalledProcessError as e:
-        print (e)
+        sys.stderr.write('git command error :%s\n' % e)
         pass
     return gitsha
 
 if __name__ == '__main__':
-    print ('%30s'% 'aubio version:', get_aubio_version())
-    print ('%30s'% 'python-aubio version:', get_aubio_pyversion())
+    if len(sys.argv) > 1 and sys.argv[1] == '-v':
+        print (get_aubio_version())
+    elif len(sys.argv) > 1 and sys.argv[1] == '-p':
+        print (get_aubio_version())
+    else:
+        print ('%30s'% 'aubio version:', get_aubio_version())
+        print ('%30s'% 'python-aubio version:', get_aubio_pyversion())
