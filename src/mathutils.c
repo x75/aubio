@@ -28,6 +28,7 @@
 /** Window types */
 typedef enum
 {
+  aubio_win_ones,
   aubio_win_rectangle,
   aubio_win_hamming,
   aubio_win_hanning,
@@ -63,7 +64,9 @@ uint_t fvec_set_window (fvec_t *win, char_t *window_type) {
   if (window_type == NULL) {
       AUBIO_ERR ("window type can not be null.\n");
       return 1;
-  } else if (strcmp (window_type, "rectangle") == 0)
+  } else if (strcmp (window_type, "ones") == 0)
+      wintype = aubio_win_ones;
+  else if (strcmp (window_type, "rectangle") == 0)
       wintype = aubio_win_rectangle;
   else if (strcmp (window_type, "hamming") == 0)
       wintype = aubio_win_hamming;
@@ -88,9 +91,11 @@ uint_t fvec_set_window (fvec_t *win, char_t *window_type) {
       return 1;
   }
   switch(wintype) {
+    case aubio_win_ones:
+      fvec_ones(win);
+      break;
     case aubio_win_rectangle:
-      for (i=0;i<size;i++)
-        w[i] = 0.5;
+      fvec_set_all(win, .5);
       break;
     case aubio_win_hamming:
       for (i=0;i<size;i++)
@@ -154,45 +159,53 @@ smpl_t
 fvec_mean (fvec_t * s)
 {
   smpl_t tmp = 0.0;
-#ifndef HAVE_ACCELERATE
+#if defined(HAVE_INTEL_IPP)
+  aubio_ippsMean(s->data, (int)s->length, &tmp);
+  return tmp;
+#elif defined(HAVE_ACCELERATE)
+  aubio_vDSP_meanv(s->data, 1, &tmp, s->length);
+  return tmp;
+#else
   uint_t j;
   for (j = 0; j < s->length; j++) {
     tmp += s->data[j];
   }
-  return tmp / (smpl_t) (s->length);
-#else
-  aubio_vDSP_meanv(s->data, 1, &tmp, s->length);
-  return tmp;
-#endif /* HAVE_ACCELERATE */
+  return tmp / (smpl_t)(s->length);
+#endif
 }
 
 smpl_t
 fvec_sum (fvec_t * s)
 {
   smpl_t tmp = 0.0;
-#ifndef HAVE_ACCELERATE
+#if defined(HAVE_INTEL_IPP)
+  aubio_ippsSum(s->data, (int)s->length, &tmp);
+#elif defined(HAVE_ACCELERATE)
+  aubio_vDSP_sve(s->data, 1, &tmp, s->length);
+#else
   uint_t j;
   for (j = 0; j < s->length; j++) {
     tmp += s->data[j];
   }
-#else
-  aubio_vDSP_sve(s->data, 1, &tmp, s->length);
-#endif /* HAVE_ACCELERATE */
+#endif
   return tmp;
 }
 
 smpl_t
 fvec_max (fvec_t * s)
 {
-#ifndef HAVE_ACCELERATE
+#if defined(HAVE_INTEL_IPP)
+  smpl_t tmp = 0.;
+  aubio_ippsMax( s->data, (int)s->length, &tmp);
+#elif defined(HAVE_ACCELERATE)
+  smpl_t tmp = 0.;
+  aubio_vDSP_maxv( s->data, 1, &tmp, s->length );
+#else
   uint_t j;
-  smpl_t tmp = 0.0;
-  for (j = 0; j < s->length; j++) {
+  smpl_t tmp = s->data[0];
+  for (j = 1; j < s->length; j++) {
     tmp = (tmp > s->data[j]) ? tmp : s->data[j];
   }
-#else
-  smpl_t tmp = 0.;
-  aubio_vDSP_maxv(s->data, 1, &tmp, s->length);
 #endif
   return tmp;
 }
@@ -200,15 +213,18 @@ fvec_max (fvec_t * s)
 smpl_t
 fvec_min (fvec_t * s)
 {
-#ifndef HAVE_ACCELERATE
-  uint_t j;
-  smpl_t tmp = s->data[0];
-  for (j = 0; j < s->length; j++) {
-    tmp = (tmp < s->data[j]) ? tmp : s->data[j];
-  }
-#else
+#if defined(HAVE_INTEL_IPP)
+  smpl_t tmp = 0.;
+  aubio_ippsMin(s->data, (int)s->length, &tmp);
+#elif defined(HAVE_ACCELERATE)
   smpl_t tmp = 0.;
   aubio_vDSP_minv(s->data, 1, &tmp, s->length);
+#else
+  uint_t j;
+  smpl_t tmp = s->data[0];
+  for (j = 1; j < s->length; j++) {
+    tmp = (tmp < s->data[j]) ? tmp : s->data[j];
+  }
 #endif
   return tmp;
 }
@@ -225,10 +241,10 @@ fvec_min_elem (fvec_t * s)
   }
 #else
   smpl_t tmp = 0.;
-  uint_t pos = 0.;
-  aubio_vDSP_minvi(s->data, 1, &tmp, (vDSP_Length *)&pos, s->length);
+  vDSP_Length pos = 0;
+  aubio_vDSP_minvi(s->data, 1, &tmp, &pos, s->length);
 #endif
-  return pos;
+  return (uint_t)pos;
 }
 
 uint_t
@@ -243,10 +259,10 @@ fvec_max_elem (fvec_t * s)
   }
 #else
   smpl_t tmp = 0.;
-  uint_t pos = 0.;
-  aubio_vDSP_maxvi(s->data, 1, &tmp, (vDSP_Length *)&pos, s->length);
+  vDSP_Length pos = 0;
+  aubio_vDSP_maxvi(s->data, 1, &tmp, &pos, s->length);
 #endif
-  return pos;
+  return (uint_t)pos;
 }
 
 void
@@ -285,6 +301,25 @@ fvec_ishift (fvec_t * s)
   if (start != half) {
     for (j = 0; j < half; j++) {
       ELEM_SWAP (s->data[half], s->data[j]);
+    }
+  }
+}
+
+void fvec_push(fvec_t *in, smpl_t new_elem) {
+  uint_t i;
+  for (i = 0; i < in->length - 1; i++) {
+    in->data[i] = in->data[i + 1];
+  }
+  in->data[in->length - 1] = new_elem;
+}
+
+void fvec_clamp(fvec_t *in, smpl_t absmax) {
+  uint_t i;
+  for (i = 0; i < in->length; i++) {
+    if (in->data[i] > 0 && in->data[i] > ABS(absmax)) {
+      in->data[i] = absmax;
+    } else if (in->data[i] < 0 && in->data[i] < -ABS(absmax)) {
+      in->data[i] = -absmax;
     }
   }
 }
@@ -548,6 +583,17 @@ aubio_next_power_of_two (uint_t a)
   uint_t i = 1;
   while (i < a) i <<= 1;
   return i;
+}
+
+uint_t
+aubio_power_of_two_order (uint_t a)
+{
+  int order = 0;
+  int temp = aubio_next_power_of_two(a);
+  while (temp >>= 1) {
+    ++order;
+  }
+  return order;
 }
 
 smpl_t

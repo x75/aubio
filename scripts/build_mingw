@@ -10,12 +10,11 @@
 set -e
 set -x
 
-source VERSION
-VERSION="$AUBIO_MAJOR_VERSION.$AUBIO_MINOR_VERSION.$AUBIO_PATCH_VERSION"
-VERSION+="$AUBIO_VERSION_STATUS"
+python this_version.py -v
+VERSION=`python $PWD/this_version.py -v`
 
 FFMPEG_BUILDS_URL="https://ffmpeg.zeranoe.com/builds"
-FFMPEG_DEFAULT="20170315-6c4665d"
+FFMPEG_DEFAULT="3.3.3"
 
 # define some default CFLAGS
 DEF_CFLAGS="-Os -I/usr/share/mingw-w64"
@@ -79,6 +78,9 @@ function build_mingw() {
   get_cflags
   CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
     ./waf distclean configure build install $WAFOPTS_TGT --testcmd='echo %s'
+  # fix dll location (see https://github.com/waf-project/waf/issues/1860)
+  mv $DESTDIR/lib/libaubio-5.dll $DESTDIR/bin
+  mv $DESTDIR/lib/libaubio-5.def $DESTDIR/bin
   zip -r $DESTDIR.zip `basename $DESTDIR`
   rm -rf $DESTDIR
   sha256sum $DESTDIR.zip > $DESTDIR.zip.sha256
@@ -87,12 +89,14 @@ function build_mingw() {
 function build_mingw32() {
   TARGET=win32
   export CC=i686-w64-mingw32-gcc
+  export NM=i686-w64-mingw32-nm
   build_mingw
 }
 
 function build_mingw64() {
   TARGET=win64
   export CC=x86_64-w64-mingw32-gcc
+  export NM=x86_64-w64-mingw32-nm
   build_mingw
 }
 
