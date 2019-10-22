@@ -56,6 +56,7 @@ struct _aubio_onset_t {
 void aubio_onset_do (aubio_onset_t *o, const fvec_t * input, fvec_t * onset)
 {
   smpl_t isonset = 0;
+  smpl_t isonset_ = 0;
   aubio_pvoc_do (o->pv,input, o->fftgrain);
   /*
   if (apply_filtering) {
@@ -70,6 +71,8 @@ void aubio_onset_do (aubio_onset_t *o, const fvec_t * input, fvec_t * onset)
   aubio_specdesc_do (o->od, o->fftgrain, o->desc);
   aubio_peakpicker_do(o->pp, o->desc, onset);
   isonset = onset->data[0];
+  isonset_ = o->desc->data[0];
+  /* AUBIO_DBG("isonset_ = %f\n", isonset_); */
   if (isonset > 0.) {
     if (aubio_silence_detection(input, o->silence)==1) {
       //AUBIO_DBG ("silent onset, not marking as onset\n");
@@ -105,6 +108,9 @@ void aubio_onset_do (aubio_onset_t *o, const fvec_t * input, fvec_t * onset)
     }
   }
   onset->data[0] = isonset;
+  if (onset->length > 1) {
+      onset->data[1] = isonset_;
+  }
   o->total_frames += o->hop_size;
   return;
 }
